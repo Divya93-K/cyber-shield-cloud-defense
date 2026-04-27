@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Shield Cloud Defense</title>
+    <style>
+        :root {
+            --bg-color: #050510;
+            --neon-cyan: #00f3ff;
+            --neon-purple: #bc13fe;
+            --neon-red: #ff003c;
+            --neon-green: #00ff66;
+            --neon-orange: #ff8c00;
+            --glass-bg: rgba(10, 20, 40, 0.6);
+            --glass-border: rgba(0, 243, 255, 0.2);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Courier New', Courier, monospace;
+            color: #fff;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10;
+            pointer-events: none; /* Let clicks pass through to 3D scene */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .panel {
+            pointer-events: auto; /* Enable clicks on panels */
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* Stats Panel */
+        #stats-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 250px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin-top: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+
+        /* Action Panel */
+        #action-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            background: rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 15px var(--neon-cyan);
+            color: #fff;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            border-color: #555;
+            color: #555;
+            background: rgba(255, 255, 255, 0.05);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .cost {
+            float: right;
+            color: #fff;
+            opacity: 0.8;
+        }
+
+        /* Alerts */
+        #alert-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 40px;
+            text-align: center;
+            border-color: var(--neon-red);
+            background: rgba(255, 0, 60, 0.2);
+            box-shadow: 0 0 20px rgba(255, 0, 60, 0.3);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #alert-bar.active {
+            opacity: 1;
+            animation: pulse-alert 1s infinite alternate;
+        }
+
+        @keyframes pulse-alert {
+            from { box-shadow: 0 0 10px rgba(255, 0, 60, 0.3); }
+            to { box-shadow: 0 0 30px rgba(255, 0, 60, 0.8); }
+        }
+
+        #alert-text {
+            margin: 0;
+            color: var(--neon-red);
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px var(--neon-red);
+        }
+
+        /* Event Log */
+        #log-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #logs {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            animation: slide-in 0.3s ease-out;
+        }
+
+        @keyframes slide-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-info { color: #aaa; }
+        .log-success { color: var(--neon-green); text-shadow: 0 0 5px var(--neon-green); }
+        .log-warning { color: var(--neon-orange); text-shadow: 0 0 5px var(--neon-orange); }
+        .log-danger { color: var(--neon-red); text-shadow: 0 0 5px var(--neon-red); }
+
+        /* Game Over / Victory Screen */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 5, 16, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: auto;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .overlay-screen.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .overlay-screen h1 {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .overlay-screen.game-over h1 {
+            color: var(--neon-red);
+            text-shadow: 0 0 20px var(--neon-red);
+        }
+
+        .overlay-screen.victory h1 {
+            color: var(--neon-green);
+            text-shadow: 0 0 20px var(--neon-green);
+        }
+
+        .overlay-screen p {
+            font-size: 1.5rem;
+            color: #ccc;
+            margin-bottom: 40px;
+        }
+
+        .overlay-screen .btn {
+            width: auto;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            margin: 0 auto;
+        }
+
+        /* Damage overlay flash */
+        #damage-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255, 0, 60, 0.3);
+            z-index: 5;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s ease;
+        }
+
+        /* Custom Scrollbar for Logs */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 4px;
+        }
+
+        /* Target Reticle for selection */
+        #selection-info {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--neon-cyan);
+            padding: 5px 10px;
+            color: var(--neon-cyan);
+            font-size: 0.8rem;
+            display: none;
+            z-index: 15;
+            box-shadow: 0 0 10px var(--neon-cyan);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="damage-flash"></div>
+    <div id="selection-info">NODE_742</div>
+
+    <div id="ui-layer">
+        <!-- Stats Panel -->
+        <div id="stats-panel" class="panel">
+            <h2>SYSTEM STATUS</h2>
+            
+            <div class="stat-row">
+                <span>CPU LOAD</span>
+                <span id="val-cpu">10%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div id="bar-cpu" class="progress-bar" style="background-color: var(--neon-cyan); width: 10%;"></div>
+            </div>
+            <br>
+
+            <div class="stat-row">
+                <span>NET LOAD</span>
+                <span id="val-net">5%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div id="bar-net" class="progress-bar" style="background-color: var(--neon-cyan); width: 5%;"></div>
+            </div>
+            <br>
+
+            <div class="stat-row">
+                <span>INTEGRITY</span>
+                <span id="val-sec" style="color: var(--neon-green)">100%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div id="bar-sec" class="progress-bar" style="background-color: var(--neon-green); width: 100%;"></div>
+            </div>
+            <br>
+
+            <div class="stat-row" style="margin-top: 15px; color: var(--neon-green);">
+                <span>BUDGET</span>
+                <span id="val-budget">$5,000</span>
+            </div>
+            
+            <div class="stat-row" style="margin-top: 5px;">
+                <span>WAVE</span>
+                <span id="val-wave">1 / 15</span>
+            </div>
+            <div class="stat-row" style="margin-top: 5px; font-size: 0.8rem; color: #aaa;">
+                <span>SCORE</span>
+                <span id="val-score">0</span>
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div id="alert-bar" class="panel">
+            <h3 id="alert-text">ALERT</h3>
+        </div>
+
+        <!-- Action Panel -->
+        <div id="action-panel" class="panel">
+            <h2>DEFENSE PROTOCOLS</h2>
+            <div style="font-size: 0.8rem; color: #aaa; margin-bottom: 10px; text-align: center;">
+                Select a server node to deploy countermeasures.
+            </div>
+            <button class="btn" id="btn-firewall" onclick="takeAction('firewall')">
+                🛡️ Firewall <span class="cost">$500</span>
+                <div style="font-size: 0.7rem; color: #888; text-transform: none;">Blocks Low Threats</div>
+            </button>
+            <button class="btn" id="btn-block-ip" onclick="takeAction('block_ip')">
+                🚫 Block IP <span class="cost">$1,200</span>
+                <div style="font-size: 0.7rem; color: #888; text-transform: none;">Blocks Medium Threats</div>
+            </button>
+            <button class="btn" id="btn-rotate" onclick="takeAction('rotate_creds')">
+                🔐 Rotate Creds <span class="cost">$3,000</span>
+                <div style="font-size: 0.7rem; color: #888; text-transform: none;">Stops Critical Breaches</div>
+            </button>
+            <button class="btn" id="btn-scale" onclick="takeAction('scale_res')" style="border-color: var(--neon-purple); color: var(--neon-purple);">
+                🔄 Scale Resources <span class="cost">$2,000</span>
+                <div style="font-size: 0.7rem; color: #888; text-transform: none;">-30% CPU/NET Load globally</div>
+            </button>
+        </div>
+
+        <!-- Logs -->
+        <div id="log-panel" class="panel">
+            <div id="logs">
+                <div class="log-entry log-info">> SYSTEM BOOT SEQUENCE INITIATED...</div>
+                <div class="log-entry log-info">> CORE HUB ONLINE.</div>
+                <div class="log-entry log-info">> ESTABLISHING UPLINKS...</div>
+                <div class="log-entry log-success">> DEFENSE PROTOCOLS ACTIVE.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="screen-gameover" class="overlay-screen game-over">
+        <h1>SYSTEM BREACHED</h1>
+        <p>Core infrastructure has been compromised.</p>
+        <div style="margin-bottom: 30px; font-size: 1.2rem; color: #aaa;">
+            Wave Reached: <span id="end-wave-fail" style="color: #fff"></span><br>
+            Final Score: <span id="end-score-fail" style="color: #fff"></span>
+        </div>
+        <button class="btn" onclick="location.reload()" style="border-color: var(--neon-red); color: var(--neon-red);">REBOOT SYSTEM</button>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="screen-victory" class="overlay-screen victory">
+        <h1>DEFENSE SUCCESSFUL</h1>
+        <p>You have survived all attack waves.</p>
+        <div style="margin-bottom: 30px; font-size: 1.2rem; color: #aaa;">
+            Integrity Remaining: <span id="end-int-win" style="color: var(--neon-green)"></span><br>
+            Final Score: <span id="end-score-win" style="color: var(--neon-green)"></span>
+        </div>
+        <button class="btn" onclick="location.reload()" style="border-color: var(--neon-green); color: var(--neon-green);">PLAY AGAIN</button>
+    </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // --- GAME STATE ---
+        const Game = {
+            state: 'playing', // playing, gameover, victory
+            stats: {
+                cpu: 10,
+                net: 5,
+                integrity: 100,
+                budget: 3000,
+                wave: 1,
+                maxWaves: 15,
+                score: 0,
+                timeActive: 0
+            },
+            costs: {
+                firewall: 500,
+                block_ip: 1200,
+                rotate_creds: 3000,
+                scale_res: 2000
+            },
+            servers: [], // Array to hold server mesh data
+            threats: [], // Active threats
+            selectedServer: null,
+            waveTimer: 0,
+            threatTimer: 0,
+            baseThreatInterval: 8000 // ms
+        };
+
+        const ThreatTypes = {
+            low: { name: 'Brute Force', level: 1, color: 0xffff00, cssColor: 'var(--neon-orange)', dCpu: 0.5, dNet: 0.5, dInt: 0, requiredAction: 'firewall' },
+            medium: { name: 'DDoS Attack', level: 2, color: 0xff8c00, cssColor: 'var(--neon-orange)', dCpu: 1.5, dNet: 2.0, dInt: 0.2, requiredAction: 'block_ip' },
+            high: { name: 'Breach Attempt', level: 3, color: 0xff0000, cssColor: 'var(--neon-red)', dCpu: 3.0, dNet: 1.0, dInt: 1.0, requiredAction: 'rotate_creds' }
+        };
+
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050510, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 40, 60);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.1; // Don't go below ground
+        controls.minDistance = 20;
+        controls.maxDistance = 150;
+
+        // --- SCENE CREATION ---
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x222244);
+        scene.add(ambientLight);
+
+        const coreLight = new THREE.PointLight(0x00f3ff, 2, 100);
+        coreLight.position.set(0, 0, 0);
+        scene.add(coreLight);
+
+        // Core Hub
+        const coreGeo = new THREE.IcosahedronGeometry(5, 1);
+        const coreMat = new THREE.MeshPhongMaterial({
+            color: 0x0088ff,
+            emissive: 0x0044aa,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.8
+        });
+        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(coreMesh);
+
+        // Core glow
+        const coreGlowGeo = new THREE.SphereGeometry(6, 32, 32);
+        const coreGlowMat = new THREE.MeshBasicMaterial({
+            color: 0x00f3ff,
+            transparent: true,
+            opacity: 0.1,
+            blending: THREE.AdditiveBlending
+        });
+        const coreGlow = new THREE.Mesh(coreGlowGeo, coreGlowMat);
+        scene.add(coreGlow);
+
+        // Particle background
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesCount = 2000;
+        const posArray = new Float32Array(particlesCount * 3);
+        for(let i=0; i < particlesCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 400;
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMat = new THREE.PointsMaterial({
+            size: 0.5,
+            color: 0xbc13fe,
+            transparent: true,
+            opacity: 0.5,
+            blending: THREE.AdditiveBlending
+        });
+        const particlesMesh = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particlesMesh);
+
+        // Servers & Connections
+        const serverGeo = new THREE.BoxGeometry(3, 4, 3);
+        const serverMatTemplate = new THREE.MeshPhongMaterial({
+            color: 0x222233,
+            emissive: 0x111122,
+            specular: 0x00f3ff,
+            shininess: 30
+        });
+
+        const numServers = 8;
+        const radius = 25;
+        const connections = new THREE.Group();
+        scene.add(connections);
+
+        const lineMat = new THREE.LineBasicMaterial({ 
+            color: 0x00f3ff, 
+            transparent: true, 
+            opacity: 0.3 
+        });
+
+        for(let i=0; i < numServers; i++) {
+            const angle = (i / numServers) * Math.PI * 2;
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+            
+            const serverMat = serverMatTemplate.clone();
+            const server = new THREE.Mesh(serverGeo, serverMat);
+            server.position.set(x, 0, z);
+            
+            // Add identifying text roughly (using basic meshes to make it look complex)
+            const detailGeo = new THREE.BoxGeometry(3.2, 0.5, 3.2);
+            const detailMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent:true, opacity: 0.5 });
+            const detail = new THREE.Mesh(detailGeo, detailMat);
+            server.add(detail);
+
+            scene.add(server);
+
+            // Create line to core
+            const points = [];
+            points.push(new THREE.Vector3(x, 0, z));
+            points.push(new THREE.Vector3(0, 0, 0));
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(lineGeo, lineMat.clone());
+            connections.add(line);
+
+            Game.servers.push({
+                mesh: server,
+                line: line,
+                id: 'NODE_' + Math.floor(Math.random() * 900 + 100),
+                baseColor: 0x111122,
+                activeThreat: null,
+                selectionRing: null
+            });
+
+            // Create selection ring (hidden initially)
+            const ringGeo = new THREE.RingGeometry(4, 4.5, 32);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.position.set(x, -1.9, z);
+            ring.visible = false;
+            scene.add(ring);
+            Game.servers[i].selectionRing = ring;
+        }
+
+        // --- INTERACTION (RAYCASTING) ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const selectionInfo = document.getElementById('selection-info');
+
+        window.addEventListener('mousemove', (e) => {
+            if(Game.state !== 'playing') return;
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            // Move selection info tooltip
+            if(selectionInfo.style.display === 'block') {
+                selectionInfo.style.left = (e.clientX + 15) + 'px';
+                selectionInfo.style.top = (e.clientY + 15) + 'px';
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            if(Game.state !== 'playing') return;
+            // Ignore clicks on UI
+            if(e.target.closest('.panel')) return;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(Game.servers.map(s => s.mesh));
+
+            if(intersects.length > 0) {
+                const clickedMesh = intersects[0].object;
+                selectServer(clickedMesh);
+            } else {
+                deselectServer();
+            }
+        });
+
+        function selectServer(mesh) {
+            deselectServer();
+            const serverData = Game.servers.find(s => s.mesh === mesh);
+            if(serverData) {
+                Game.selectedServer = serverData;
+                serverData.selectionRing.visible = true;
+                selectionInfo.style.display = 'block';
+                selectionInfo.innerText = serverData.id + (serverData.activeThreat ? ` [THREAT: ${serverData.activeThreat.name}]` : ' [SECURE]');
+                
+                if(serverData.activeThreat) {
+                    selectionInfo.style.color = '#ff003c';
+                    selectionInfo.style.borderColor = '#ff003c';
+                } else {
+                    selectionInfo.style.color = '#00f3ff';
+                    selectionInfo.style.borderColor = '#00f3ff';
+                }
+            }
+        }
+
+        function deselectServer() {
+            if(Game.selectedServer) {
+                Game.selectedServer.selectionRing.visible = false;
+                Game.selectedServer = null;
+            }
+            selectionInfo.style.display = 'none';
+        }
+
+        // --- GAME LOGIC ---
+
+        function logEvent(msg, type = 'info') {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric", second: "numeric" });
+            entry.innerText = `[${time}] ${msg}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+            
+            // Keep log size manageable
+            if(logs.children.length > 50) {
+                logs.removeChild(logs.firstChild);
+            }
+        }
+
+        function showAlert(msg, colorCss) {
+            const bar = document.getElementById('alert-bar');
+            const text = document.getElementById('alert-text');
+            text.innerText = msg;
+            text.style.color = colorCss;
+            text.style.textShadow = `0 0 10px ${colorCss}`;
+            bar.style.backgroundColor = colorCss.replace(')', ', 0.2)').replace('rgb', 'rgba'); // Hacky transparent bg
+            bar.style.boxShadow = `0 0 20px ${colorCss.replace(')', ', 0.3)').replace('rgb', 'rgba')}`;
+            
+            bar.classList.add('active');
+            setTimeout(() => {
+                bar.classList.remove('active');
+            }, 3000);
+        }
+
+        function flashDamage() {
+            const flash = document.getElementById('damage-flash');
+            flash.style.opacity = '1';
+            setTimeout(() => { flash.style.opacity = '0'; }, 150);
+        }
+
+        function spawnThreat() {
+            if(Game.state !== 'playing') return;
+
+            // Find servers without threats
+            const availableServers = Game.servers.filter(s => !s.activeThreat);
+            if(availableServers.length === 0) return; // All servers under attack!
+
+            const targetServer = availableServers[Math.floor(Math.random() * availableServers.length)];
+
+            // Determine threat level based on wave
+            let typeKeys = Object.keys(ThreatTypes);
+            let probabilities = [];
+            
+            if(Game.stats.wave <= 3) {
+                probabilities = [0.8, 0.2, 0.0]; // Mostly low
+            } else if (Game.stats.wave <= 7) {
+                probabilities = [0.5, 0.4, 0.1]; // Intro medium
+            } else if (Game.stats.wave <= 11) {
+                probabilities = [0.3, 0.5, 0.2]; // Intro high
+            } else {
+                probabilities = [0.2, 0.4, 0.4]; // Brutal
+            }
+
+            const rand = Math.random();
+            let sum = 0;
+            let selectedTypeKey = 'low';
+            for(let i=0; i<3; i++) {
+                sum += probabilities[i];
+                if(rand <= sum) {
+                    selectedTypeKey = typeKeys[i];
+                    break;
+                }
+            }
+
+            const type = ThreatTypes[selectedTypeKey];
+            
+            targetServer.activeThreat = type;
+            Game.threats.push(targetServer);
+
+            // Visual update
+            targetServer.mesh.material.emissive.setHex(type.color);
+            targetServer.line.material.color.setHex(type.color);
+            targetServer.line.material.opacity = 0.8;
+
+            logEvent(`WARNING: ${type.name} detected on ${targetServer.id}!`, 'danger');
+            showAlert(`${type.name.toUpperCase()} ON ${targetServer.id}`, type.cssColor);
+            
+            // Re-render selection info if this server is selected
+            if(Game.selectedServer === targetServer) selectServer(targetServer.mesh);
+        }
+
+        window.takeAction = function(actionType) {
+            if(Game.state !== 'playing') return;
+
+            const cost = Game.costs[actionType];
+            if(Game.stats.budget < cost) {
+                logEvent(`Action denied: Insufficient funds for ${actionType}.`, 'warning');
+                return;
+            }
+
+            // Global actions
+            if(actionType === 'scale_res') {
+                Game.stats.budget -= cost;
+                Game.stats.cpu = Math.max(0, Game.stats.cpu - 30);
+                Game.stats.net = Math.max(0, Game.stats.net - 30);
+                logEvent(`SUCCESS: Scaled resources. Load reduced.`, 'success');
+                updateUI();
+                
+                // Visual burst from core
+                createExplosion(new THREE.Vector3(0,0,0), 0xbc13fe);
+                return;
+            }
+
+            // Targeted actions require a server selection
+            if(!Game.selectedServer) {
+                logEvent(`Action failed: No target server selected.`, 'warning');
+                return;
+            }
+
+            const server = Game.selectedServer;
+            const threat = server.activeThreat;
+
+            if(!threat) {
+                logEvent(`Action wasted: Server ${server.id} is secure.`, 'info');
+                Game.stats.budget -= cost;
+                updateUI();
+                return;
+            }
+
+            let success = false;
+
+            if(actionType === 'firewall') {
+                if(threat === ThreatTypes.low) success = true;
+            } else if (actionType === 'block_ip') {
+                if(threat === ThreatTypes.low || threat === ThreatTypes.medium) success = true;
+            } else if (actionType === 'rotate_creds') {
+                success = true; // Cures anything
+            }
+
+            Game.stats.budget -= cost;
+
+            if(success) {
+                logEvent(`SUCCESS: Neutralized ${threat.name} on ${server.id}.`, 'success');
+                Game.stats.score += threat.level * 100;
+                
+                // Visual reset
+                server.mesh.material.emissive.setHex(server.baseColor);
+                server.line.material.color.setHex(0x00f3ff);
+                server.line.material.opacity = 0.3;
+                createExplosion(server.mesh.position, 0x00ff66);
+
+                // Remove threat
+                server.activeThreat = null;
+                Game.threats = Game.threats.filter(s => s !== server);
+                
+                // Update selection UI
+                selectServer(server.mesh);
+            } else {
+                logEvent(`FAILED: Action ineffective against ${threat.name}!`, 'danger');
+            }
+
+            updateUI();
+        };
+
+        // Simple particle explosion
+        const explosions = [];
+        function createExplosion(position, colorHex) {
+            const geo = new THREE.BufferGeometry();
+            const count = 30;
+            const posArray = new Float32Array(count * 3);
+            const velArray = [];
+
+            for(let i=0; i<count; i++) {
+                posArray[i*3] = position.x;
+                posArray[i*3+1] = position.y;
+                posArray[i*3+2] = position.z;
+
+                velArray.push({
+                    x: (Math.random() - 0.5) * 2,
+                    y: (Math.random() - 0.5) * 2,
+                    z: (Math.random() - 0.5) * 2
+                });
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const mat = new THREE.PointsMaterial({ size: 1, color: colorHex, transparent: true, opacity: 1, blending: THREE.AdditiveBlending });
+            const points = new THREE.Points(geo, mat);
+            scene.add(points);
+            
+            explosions.push({ mesh: points, velocities: velArray, life: 1.0 });
+        }
+
+        function updateUI() {
+            // Cap values
+            Game.stats.cpu = Math.min(100, Math.max(0, Game.stats.cpu));
+            Game.stats.net = Math.min(100, Math.max(0, Game.stats.net));
+            Game.stats.integrity = Math.min(100, Math.max(0, Game.stats.integrity));
+
+            // Format UI text
+            document.getElementById('val-cpu').innerText = Game.stats.cpu.toFixed(1) + '%';
+            document.getElementById('val-net').innerText = Game.stats.net.toFixed(1) + '%';
+            document.getElementById('val-sec').innerText = Game.stats.integrity.toFixed(1) + '%';
+            document.getElementById('val-budget').innerText = '$' + Math.floor(Game.stats.budget).toLocaleString();
+            document.getElementById('val-wave').innerText = Game.stats.wave + ' / ' + Game.stats.maxWaves;
+            document.getElementById('val-score').innerText = Math.floor(Game.stats.score).toLocaleString();
+
+            // Progress bars
+            const barCpu = document.getElementById('bar-cpu');
+            barCpu.style.width = Game.stats.cpu + '%';
+            barCpu.style.backgroundColor = Game.stats.cpu > 80 ? 'var(--neon-red)' : (Game.stats.cpu > 50 ? 'var(--neon-orange)' : 'var(--neon-cyan)');
+            document.getElementById('val-cpu').style.color = barCpu.style.backgroundColor;
+
+            const barNet = document.getElementById('bar-net');
+            barNet.style.width = Game.stats.net + '%';
+            barNet.style.backgroundColor = Game.stats.net > 80 ? 'var(--neon-red)' : (Game.stats.net > 50 ? 'var(--neon-orange)' : 'var(--neon-cyan)');
+            document.getElementById('val-net').style.color = barNet.style.backgroundColor;
+
+            const barSec = document.getElementById('bar-sec');
+            barSec.style.width = Game.stats.integrity + '%';
+            barSec.style.backgroundColor = Game.stats.integrity < 30 ? 'var(--neon-red)' : (Game.stats.integrity < 70 ? 'var(--neon-orange)' : 'var(--neon-green)');
+            document.getElementById('val-sec').style.color = barSec.style.backgroundColor;
+
+            // Button states
+            ['firewall', 'block-ip', 'rotate', 'scale'].forEach(id => {
+                const btn = document.getElementById('btn-' + id);
+                let costKey = id === 'block-ip' ? 'block_ip' : (id === 'rotate' ? 'rotate_creds' : (id === 'scale' ? 'scale_res' : id));
+                if(Game.stats.budget < Game.costs[costKey]) {
+                    btn.disabled = true;
+                } else {
+                    btn.disabled = false;
+                }
+            });
+        }
+
+        function gameOver() {
+            Game.state = 'gameover';
+            document.getElementById('end-wave-fail').innerText = Game.stats.wave;
+            document.getElementById('end-score-fail').innerText = Math.floor(Game.stats.score).toLocaleString();
+            document.getElementById('screen-gameover').classList.add('active');
+            coreMesh.material.color.setHex(0xff0000);
+            coreMesh.material.emissive.setHex(0x550000);
+        }
+
+        function victory() {
+            Game.state = 'victory';
+            document.getElementById('end-int-win').innerText = Game.stats.integrity.toFixed(1) + '%';
+            document.getElementById('end-score-win').innerText = Math.floor(Game.stats.score).toLocaleString();
+            document.getElementById('screen-victory').classList.add('active');
+        }
+
+        // --- MAIN LOOP ---
+        const clock = new THREE.Clock();
+        let lastTime = 0;
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            const dt = clock.getDelta();
+            const timeMs = time;
+            
+            // Orbit and rotations
+            controls.update();
+            coreMesh.rotation.y += 0.01;
+            coreMesh.rotation.x += 0.005;
+            coreGlow.scale.setScalar(1 + Math.sin(timeMs * 0.002) * 0.05);
+
+            Game.servers.forEach(s => {
+                s.mesh.rotation.y += 0.02;
+                if(s.selectionRing && s.selectionRing.visible) {
+                    s.selectionRing.rotation.z += 0.05;
+                }
+            });
+
+            // Update Explosions
+            for(let i=explosions.length-1; i>=0; i--) {
+                const exp = explosions[i];
+                exp.life -= dt * 2;
+                if(exp.life <= 0) {
+                    scene.remove(exp.mesh);
+                    explosions.splice(i, 1);
+                    continue;
+                }
+                const positions = exp.mesh.geometry.attributes.position.array;
+                for(let j=0; j<positions.length/3; j++) {
+                    positions[j*3] += exp.velocities[j].x * dt * 20;
+                    positions[j*3+1] += exp.velocities[j].y * dt * 20;
+                    positions[j*3+2] += exp.velocities[j].z * dt * 20;
+                }
+                exp.mesh.geometry.attributes.position.needsUpdate = true;
+                exp.mesh.material.opacity = exp.life;
+            }
+
+            // Particles slow rotation
+            particlesMesh.rotation.y += 0.0005;
+
+            // --- GAMEPLAY TICK ---
+            if(Game.state === 'playing') {
+                
+                // Threat Spawning
+                if(timeMs - Game.threatTimer > Game.baseThreatInterval - (Game.stats.wave * 300)) { // Gets faster
+                    spawnThreat();
+                    Game.threatTimer = timeMs;
+                }
+
+                // Wave progression
+                if(timeMs - Game.waveTimer > 30000) { // 30s per wave
+                    Game.stats.wave++;
+                    Game.waveTimer = timeMs;
+                    if(Game.stats.wave > Game.maxWaves) {
+                        victory();
+                    } else {
+                        logEvent(`>>> WAVE ${Game.stats.wave} INITIATED <<<`, 'warning');
+                        Game.stats.score += 500; // Wave completion bonus
+                        Game.stats.budget += 1000; // Wave budget injection
+                    }
+                }
+
+                // Passive effects (run roughly every frame based on dt)
+                Game.stats.budget += 50 * dt; // Passive income
+                Game.stats.score += 10 * dt; // Survival points
+
+                // Threat damage application
+                let flashNeeded = false;
+                Game.threats.forEach(server => {
+                    const t = server.activeThreat;
+                    Game.stats.cpu += t.dCpu * dt;
+                    Game.stats.net += t.dNet * dt;
+                    Game.stats.integrity -= t.dInt * dt;
+                    if(t.dInt > 0) flashNeeded = true;
+                    
+                    // Pulse effect on line
+                    server.line.material.opacity = 0.5 + Math.sin(timeMs * 0.01) * 0.5;
+                });
+
+                // Overload penalties
+                if(Game.stats.cpu > 100) { Game.stats.integrity -= 2 * dt; flashNeeded = true; }
+                if(Game.stats.net > 100) { Game.stats.integrity -= 2 * dt; flashNeeded = true; }
+                
+                // Auto-recovery if load is low and no active threats
+                if(Game.threats.length === 0 && Game.stats.cpu < 50 && Game.stats.net < 50) {
+                    Game.stats.integrity += 1 * dt; 
+                }
+
+                if(flashNeeded && Math.random() < 0.1) flashDamage(); // Flash sporadically when under heavy attack
+
+                updateUI();
+
+                if(Game.stats.integrity <= 0) {
+                    gameOver();
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- INIT ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        updateUI();
+        Game.waveTimer = performance.now();
+        Game.threatTimer = performance.now();
+        animate(performance.now());
+
+    </script>
+</body>
+</html>
